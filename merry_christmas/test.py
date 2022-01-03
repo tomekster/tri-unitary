@@ -279,5 +279,5 @@ state['SUmidcut_ED'] = SUmidcut_ED
 state['SUmidcut_SWED'] = SUmidcut_SWED
 state['P1'] = P1
 state['P2'] = P2
-state['nmin']: np.array([runs+1])
+state['nmin'] = np.array([runs+1])
 checkpoint.save(state)
