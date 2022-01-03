@@ -119,9 +119,11 @@ class Checkpoint:
 
     def save(self, state):
         new_version = 1 - self.get_version()
-        for key in State.fields:
+        for key, val in state.fields_dict:
+            if isinstance(val, int): 
+                continue
             filepath = os.path.join(checkpoint_path, '{}_{}.npy'.format(new_version, key))
-            np.save(filepath, state[key])
+            np.save(filepath, val)
         self.save_version(new_version)
 
     def load(self):
@@ -139,15 +141,10 @@ class Checkpoint:
 #### state class
 
 class State:
-    fields = ['nmin','SUmidcut_SW','SUmidcut_ED','SUmidcut_SWED','P1','P2']
-    scalars = ['nmin']
+    #fields = ['nmin','SUmidcut_SW','SUmidcut_ED','SUmidcut_SWED','P1','P2']
+    #scalars = ['nmin']
 
     def __init__(self, fields_dict=None):
-
-        if fields_dict:
-            for scalar in State.scalars:
-                if type(fields_dict[scalar]) is not int:
-                    fields_dict[scalar] = int(fields_dict[scalar])
         self.fields_dict = fields_dict 
         
 
@@ -158,13 +155,7 @@ class State:
         self.fields_dict[key] = val
 
     def reset(self, L, chunk_size):
-
-        self.fields_dict = {'nmin': 0,\
-                            'SUmidcut_SW': np.zeros((chunk_size,len(gvec))),\
-                            'SUmidcut_ED': np.zeros((chunk_size,len(gvec))),\
-                            'SUmidcut_SWED': np.zeros((chunk_size,len(gvec))),\
-                            'P1': np.zeros((chunk_size,len(gvec),L,3*L)),\
-                            'P2': np.zeros((chunk_size,len(gvec),L,3**2*L))}
+        self.fields_dict = DEFAULT_FIELDS_DICT
         return self
 
     
@@ -197,6 +188,20 @@ W=1.
 J=1.
 gvec=np.concatenate((np.arange(0,0.3,0.01),np.arange(0.3,0.5,0.05),np.arange(0.5,1,0.1)))
 x_cutop=L//2
+
+##########################################################
+
+DEFAULT_FIELDS_DICT = {
+    'nmin': 0,\
+    'SUmidcut_SW': np.zeros((chunk_size,len(gvec))),\
+    'SUmidcut_ED': np.zeros((chunk_size,len(gvec))),\
+    'SUmidcut_SWED': np.zeros((chunk_size,len(gvec))),\
+    'P1': np.zeros((chunk_size,len(gvec),L,3*L)),\
+    'P2': np.zeros((chunk_size,len(gvec),L,3**2*L))
+}
+
+##########################################################
+
 
 ## Stuff for specific run
 run_identifier = 'L%d_chunk_id_%s'%(L, chunk_id)
@@ -270,7 +275,7 @@ for runs in range(nmin,chunk_size):
             
         print([runs,g])
         
-    state = State({'SUmidcut_SW': SUmidcut_SW,'SUmidcut_ED': SUmidcut_ED, 'SUmidcut_SWED': SUmidcut_SWED, 'P1':P1, 'P2':P2, 'nmin': np.array([runs])})
+    state = State({'SUmidcut_SW': SUmidcut_SW,'SUmidcut_ED': SUmidcut_ED, 'SUmidcut_SWED': SUmidcut_SWED, 'P1':P1, 'P2':P2, 'nmin': runs})
     checkpoint.save(state)
     
 # SAVE FINAL RESULT
@@ -279,5 +284,5 @@ state['SUmidcut_ED'] = SUmidcut_ED
 state['SUmidcut_SWED'] = SUmidcut_SWED
 state['P1'] = P1
 state['P2'] = P2
-state['nmin'] = np.array([runs+1])
+state['nmin']: np.array([runs+1])
 checkpoint.save(state)
