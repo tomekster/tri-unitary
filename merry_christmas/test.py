@@ -103,7 +103,7 @@ class Checkpoint:
             os.mkdir(checkpoint_path)
 
         version_file = 'version'
-        self.version_path = os.path.join(checkpoint_path, version_file)
+        self.version_path = os.path.join(self.checkpoint_path, version_file)
 
         if not os.path.exists(self.version_path):
             self.save_version(0)
@@ -119,44 +119,36 @@ class Checkpoint:
 
     def save(self, state):
         new_version = 1 - self.get_version()
-        for key, val in state.fields_dict:
-            if isinstance(val, int): 
+        for key, val in state.__dict__:
+            if isinstance(val, int):
                 continue
-            filepath = os.path.join(checkpoint_path, '{}_{}.npy'.format(new_version, key))
+            filepath = os.path.join(self.checkpoint_path, '{}_{}.npy'.format(new_version, key))
             np.save(filepath, val)
         self.save_version(new_version)
 
     def load(self):
         current_version = self.get_version()
+        state = State()
         try:
-            fields_dict = {}
-            for f in State.fields:
+            for key, _ in state.__dict__:
                 print('Loading: ', f)
-                fields_dict[f] = np.load(os.path.join(self.checkpoint_path, '{}_{}.npy'.format(current_version, f)))
+                val = np.load(os.path.join(self.checkpoint_path, '{}_{}.npy'.format(current_version, f)))
+                setattr(state, key, val)
         except Exception as e:
             print(e)
             return None
-        return State(fields_dict)
+        return state
 
 #### state class
 
 class State:
-    #fields = ['nmin','SUmidcut_SW','SUmidcut_ED','SUmidcut_SWED','P1','P2']
-    #scalars = ['nmin']
-
-    def __init__(self, fields_dict=None):
-        self.fields_dict = fields_dict 
-        
-
-    def __getitem__(self, key):
-        return self.fields_dict[key]
-
-    def __setitem__(self, key, val):
-        self.fields_dict[key] = val
-
-    def reset(self, L, chunk_size):
-        self.fields_dict = DEFAULT_FIELDS_DICT
-        return self
+    def __init__(self, L=1, chunk_size=1):
+        self.nmin = 0
+        self.SUmidcut_SW = np.zeros((chunk_size,len(gvec)))
+        self.SUmidcut_ED = np.zeros((chunk_size,len(gvec)))
+        self.SUmidcut_SWED = np.zeros((chunk_size,len(gvec)))
+        self.P1 = np.zeros((chunk_size,len(gvec),L,3*L))
+        self.P2 = np.zeros((chunk_size,len(gvec),L,3**2*L))
 
     
 ### reading in parameters
@@ -171,7 +163,6 @@ def parse_params_json(params_json):
     directory = params['directory']
     return L, chunk_id, chunk_size, directory
 
-############################################################
 
 # Takes as input 1 parameters: L
 params_json = sys.argv[1]
@@ -189,20 +180,6 @@ J=1.
 gvec=np.concatenate((np.arange(0,0.3,0.01),np.arange(0.3,0.5,0.05),np.arange(0.5,1,0.1)))
 x_cutop=L//2
 
-##########################################################
-
-DEFAULT_FIELDS_DICT = {
-    'nmin': 0,\
-    'SUmidcut_SW': np.zeros((chunk_size,len(gvec))),\
-    'SUmidcut_ED': np.zeros((chunk_size,len(gvec))),\
-    'SUmidcut_SWED': np.zeros((chunk_size,len(gvec))),\
-    'P1': np.zeros((chunk_size,len(gvec),L,3*L)),\
-    'P2': np.zeros((chunk_size,len(gvec),L,3**2*L))
-}
-
-##########################################################
-
-
 ## Stuff for specific run
 run_identifier = 'L%d_chunk_id_%s'%(L, chunk_id)
 checkpoint_path = os.path.join(directory, run_identifier)
@@ -212,22 +189,14 @@ checkpoint = Checkpoint(checkpoint_path)
 state=checkpoint.load()
 if not state: # If failed to read state for the file - reset state
     print("Failed to load checkpoint, reseting state")
-    state = State().reset(L, chunk_size)
-
-nmin = state['nmin']
-SUmidcut_SW = state['SUmidcut_SW']
-SUmidcut_ED = state['SUmidcut_ED']
-SUmidcut_SWED = state['SUmidcut_SWED']
-P1 = state['P1']
-P2 = state['P2']
-
+    state = State(L, chunk_size)
 
 # Here we have init default state OR we have state from checkpoint
-print(nmin)
+print(state.nmin)
 
 times=[]
 
-for runs in range(nmin,chunk_size):
+for runs in range(state.nmin,chunk_size):
     ## Hdiag
     hlist=np.random.uniform(-W,W,L)
     Hdiag= -.25*J*(gen_nn_int(z,[],'obc')) + .5*gen_onsite_field(z,hlist);
@@ -240,14 +209,14 @@ for runs in range(nmin,chunk_size):
         Omega=expm(-g*Atot) #SW unitary
             ## Operator space entanglement of U=Omega=e^{-Atot}=SW unitary
         psi=Utostate(Omega,xcutop_to_xcutstate(L,x_cutop)).flatten()
-        SUmidcut_SW[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
+        state.SUmidcut_SW[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
 
         ## ED
         H=Hdiag+g*Hkick
         evals_g,evecs_g = LA.eigh(H.todense()) #get exact eigenstates
             ## Operator space entanglement of U = sorted eigenvectors (incr. energy)
         psi=Utostate(np.asarray(evecs_g),xcutop_to_xcutstate(L,x_cutop)).flatten()
-        SUmidcut_ED[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
+        state.SUmidcut_ED[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
 
         
         ## Overlap between ED and SW generator
@@ -260,7 +229,7 @@ for runs in range(nmin,chunk_size):
         
         ## Operator space entanglement of (reshuffled) U 
         psi=Utostate(U,xcutop_to_xcutstate(L,x_cutop)).flatten()
-        SUmidcut_SWED[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
+        state.SUmidcut_SWED[runs,g_ind]=EntanglementEntropy(psi,2*x_cutop,dim=2)
         
         ## Operator weight
         for i in range(L):
@@ -270,19 +239,11 @@ for runs in range(nmin,chunk_size):
             #b=time.time()
             #times.append(b-a)
             #print([runs,g,i,b-a])
-            P1[runs,g_ind,i,:]=P1_temp
-            P2[runs,g_ind,i,:]=P2_temp
+            state.P1[runs,g_ind,i,:]=P1_temp
+            state.P2[runs,g_ind,i,:]=P2_temp
             
         print([runs,g])
-        
-    state = State({'SUmidcut_SW': SUmidcut_SW,'SUmidcut_ED': SUmidcut_ED, 'SUmidcut_SWED': SUmidcut_SWED, 'P1':P1, 'P2':P2, 'nmin': runs})
     checkpoint.save(state)
     
 # SAVE FINAL RESULT
-state['SUmidcut_SW'] = SUmidcut_SW
-state['SUmidcut_ED'] = SUmidcut_ED
-state['SUmidcut_SWED'] = SUmidcut_SWED
-state['P1'] = P1
-state['P2'] = P2
-state['nmin'] = np.array([runs+1])
 checkpoint.save(state)
