@@ -13,9 +13,9 @@ def myround(x, base):
 CONFIG_PATH='config.csv'
 
 def generate_config():    
-    L=10
+    L=5
     op_weight_vec=np.arange(1,L+1,1)
-    Hind_vec=np.arange(0,10) ## average over Hamiltonian initiations
+    Hind_vec=np.arange(0,1) ## average over Hamiltonian initiations
     #niter=2 ## average over operators (how  many do we sample per weight?) 
             ## could also make this weight-dependent and define niter in opweight loop
     #chunk_size=1 #break them into chunks
@@ -69,14 +69,14 @@ for index, row in config.iterrows():
     for i in range(num_jobs):
         params['chunk_id'] = i
         params_string = json.dumps(params, separators=(',',':'))
-        command = 'sbatch {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
+        command = 'bash {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
         os.system(command)
 
     if niter % chunk_size != 0:
         params['chunk_id'] = num_jobs
         params['chunk_size'] = niter % chunk_size
         params_string = json.dumps(params, separators=(',',':'))
-        command = 'sbatch {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
+        command = 'bash {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
         os.system(command)
 
 

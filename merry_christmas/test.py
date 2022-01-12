@@ -119,7 +119,7 @@ class Checkpoint:
 
     def save(self, state):
         new_version = 1 - self.get_version()
-        for key, val in state.__dict__:
+        for (key, val) in state.__dict__.items():
             if isinstance(val, int):
                 continue
             filepath = os.path.join(self.checkpoint_path, '{}_{}.npy'.format(new_version, key))
@@ -130,9 +130,9 @@ class Checkpoint:
         current_version = self.get_version()
         state = State()
         try:
-            for key, _ in state.__dict__:
-                print('Loading: ', f)
-                val = np.load(os.path.join(self.checkpoint_path, '{}_{}.npy'.format(current_version, f)))
+            for (key, val) in state.__dict__.items():
+                print('Loading: ', key)
+                val = np.load(os.path.join(self.checkpoint_path, '{}_{}.npy'.format(current_version, key)))
                 setattr(state, key, val)
         except Exception as e:
             print(e)
