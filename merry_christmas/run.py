@@ -69,14 +69,14 @@ for index, row in config.iterrows():
     for i in range(num_jobs):
         params['chunk_id'] = i
         params_string = json.dumps(params, separators=(',',':'))
-        command = 'bash {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
+        command = 'sbatch {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
         os.system(command)
 
     if niter % chunk_size != 0:
         params['chunk_id'] = num_jobs
         params['chunk_size'] = niter % chunk_size
         params_string = json.dumps(params, separators=(',',':'))
-        command = 'bash {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
+        command = 'sbatch {}/cheryne.qusub {} {} \'{}\''.format(directory, cput, mem, params_string)
         os.system(command)
 
 
