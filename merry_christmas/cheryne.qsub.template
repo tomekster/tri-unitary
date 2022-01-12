@@ -1,0 +1,15 @@
+#! /bin/bash
+#SBATCH -t __CPUT__
+#SBATCH --mem=__MEM__gb
+#SBATCH --mail-user=cheryne.cluster@gmail.com
+#SBATCH --mail-type=END,FAIL
+#SBATCH -n 1
+#SBATCH -N 1
+#SBATCH -p vkhemani
+#SBATCH --job-name=__NAME__
+
+export OMP_NUM_THREADS=1
+params=$3
+
+echo $params
+python3 test.py $params
